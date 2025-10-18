@@ -13,8 +13,6 @@ frontend:
       commands:
         - echo "Building the Next.js application..."
         - npm run build
-        - echo "Generating Amplify outputs..."
-        - npx ampx generate outputs --app-id $AWS_APP_ID --branch $AWS_BRANCH
   artifacts:
     baseDirectory: .next
     files:
