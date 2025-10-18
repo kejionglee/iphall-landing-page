@@ -46,7 +46,7 @@ async function testDatabaseService() {
     const quotation = await databaseService.generateQuotationSummary(
       'COPYRIGHT', 
       'LAOS', 
-      'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE'
+      'OFFICIAL COPYRIGHT RECORDATION -  FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE'
     )
     console.log('Generated quotation:')
     console.log(`  Service: ${quotation.service}`)

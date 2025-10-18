@@ -5,6 +5,9 @@ import dotenv from 'dotenv'
 // Load environment variables
 dotenv.config()
 
+// Disable TLS certificate verification for self-signed certificates
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
 export interface QuotationRecord {
   id: number
   service: string
@@ -72,7 +75,10 @@ class DatabaseService {
     try {
       this.pool = new Pool({
         connectionString: DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+        ssl: {
+          rejectUnauthorized: false,
+          checkServerIdentity: () => undefined
+        },
       })
 
       // Test the connection
@@ -81,7 +87,6 @@ class DatabaseService {
       client.release()
 
       console.log('Database connection pool created successfully')
-      await this.insertSampleData()
     } catch (error) {
       console.error('Failed to connect to database:', error)
       this.pool = null
@@ -89,53 +94,6 @@ class DatabaseService {
     }
   }
 
-  private async insertSampleData(): Promise<void> {
-    if (!this.pool) {
-      throw new Error('Database not initialized')
-    }
-
-    const sampleData = [
-      ['COPYRIGHT', 'LAOS', 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE', 1000, 500, 100, 'LAK'],
-      ['COPYRIGHT', 'INDONESIA', 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH INDONESIA COPYRIGHT OFFICE', 1200, 600, 150, 'IDR'],
-      ['PATENT', 'MALAYSIA', 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM RM7000 TO RM9000 )', 8000, 0, 0, 'MYR'],
-      ['PATENT', 'SINGAPORE', 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM SGD8000 TO SGD10000 )', 9000, 0, 0, 'SGD'],
-      ['TRADEMARK', 'THAILAND', 'TRADEMARK SEARCH - COMPREHENSIVE TRADEMARK SEARCH IN THAILAND', 500, 200, 50, 'THB'],
-      ['TRADEMARK', 'VIETNAM', 'TRADEMARK SEARCH - COMPREHENSIVE TRADEMARK SEARCH IN VIETNAM', 600, 250, 70, 'VND'],
-    ]
-
-    const client = await this.pool.connect()
-    try {
-      // Check if table exists, if not create it
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS quotationlist (
-          id SERIAL PRIMARY KEY,
-          service TEXT,
-          country TEXT,
-          item TEXT,
-          "prof fee" INTEGER,
-          "official fee" INTEGER,
-          disbursement INTEGER,
-          currency TEXT
-        )
-      `)
-
-      // Check if data already exists
-      const existingCount = await client.query('SELECT COUNT(*) FROM quotationlist')
-      if (existingCount.rows[0].count === '0') {
-        for (const dataRow of sampleData) {
-          await client.query(`
-            INSERT INTO quotationlist (service, country, item, "prof fee", "official fee", disbursement, currency)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-          `, dataRow)
-        }
-        console.log('Sample data inserted successfully')
-      } else {
-        console.log('Sample data already exists, skipping insertion')
-      }
-    } finally {
-      client.release()
-    }
-  }
 
   async getServices(): Promise<Service[]> {
     if (!this.pool) {
@@ -269,8 +227,8 @@ class DatabaseService {
         const result = await client.query(`
           SELECT item, "prof fee", "official fee", disbursement, currency
           FROM quotationlist
-          WHERE service = $1 AND country = $2 AND item = $3
-        `, [serviceName, countryName, itemName])
+          WHERE service = $1 AND country = $2 AND item ILIKE $3
+        `, [serviceName, countryName, `%${itemName}%`])
 
         if (result.rows.length === 0) {
           throw new Error(`Item not found: ${serviceName} - ${countryName} - ${itemName}`)
