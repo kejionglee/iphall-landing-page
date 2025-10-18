@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - echo "Installing Node.js dependencies..."
-        - npm ci
+        - npm ci --legacy-peer-deps
         - echo "Installing Python dependencies..."
         - pip install -r requirements.txt
         - echo "Setting up environment variables..."
