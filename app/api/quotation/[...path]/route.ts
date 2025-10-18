@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 
+// Initialize database service on first API call
+let isInitialized = false
+async function ensureDatabaseInitialized() {
+  if (!isInitialized) {
+    await databaseService.initialize()
+    isInitialized = true
+  }
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const path = url.pathname
 
   try {
+    // Ensure database is initialized
+    await ensureDatabaseInitialized()
+
     if (path === '/api/quotation/services') {
       const services = await databaseService.getServices()
       return NextResponse.json({ services })

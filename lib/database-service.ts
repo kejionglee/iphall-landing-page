@@ -1,4 +1,10 @@
-// Database service for quotation data
+// Database service for quotation data using PostgreSQL
+import { Pool, PoolClient } from 'pg'
+import dotenv from 'dotenv'
+
+// Load environment variables
+dotenv.config()
+
 export interface QuotationRecord {
   id: number
   service: string
@@ -42,206 +48,300 @@ export interface QuotationSummary {
   valid_until: string
 }
 
-// Sample data - in production this would come from a real database
-const SAMPLE_QUOTATION_DATA: QuotationRecord[] = [
-  {
-    id: 1,
-    service: 'COPYRIGHT',
-    country: 'LAOS',
-    item: 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE',
-    prof_fee: 500,
-    official_fee: 200,
-    disbursement: 50,
-    currency: 'USD'
-  },
-  {
-    id: 2,
-    service: 'COPYRIGHT',
-    country: 'INDONESIA',
-    item: 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH INDONESIA COPYRIGHT OFFICE',
-    prof_fee: 600,
-    official_fee: 250,
-    disbursement: 75,
-    currency: 'USD'
-  },
-  {
-    id: 3,
-    service: 'PATENT',
-    country: 'MALAYSIA',
-    item: 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM RM7000 TO RM9000 )',
-    prof_fee: 2000,
-    official_fee: 500,
-    disbursement: 100,
-    currency: 'MYR'
-  },
-  {
-    id: 4,
-    service: 'PATENT',
-    country: 'SINGAPORE',
-    item: 'PATENT FILING - UTILITY INNOVATION APPLICATION WITH SINGAPORE IP OFFICE',
-    prof_fee: 1500,
-    official_fee: 300,
-    disbursement: 80,
-    currency: 'SGD'
-  },
-  {
-    id: 5,
-    service: 'TRADEMARK',
-    country: 'THAILAND',
-    item: 'TRADEMARK REGISTRATION - APPLICATION FOR TRADEMARK PROTECTION IN THAILAND',
-    prof_fee: 400,
-    official_fee: 150,
-    disbursement: 60,
-    currency: 'THB'
-  }
-]
-
 class DatabaseService {
-  private data: QuotationRecord[] = SAMPLE_QUOTATION_DATA
+  private pool: Pool | null = null
+  private static instance: DatabaseService
+
+  constructor() {
+    if (DatabaseService.instance) {
+      return DatabaseService.instance
+    }
+    DatabaseService.instance = this
+  }
+
+  async initialize(): Promise<void> {
+    if (this.pool) {
+      return // Already initialized
+    }
+
+    const DATABASE_URL = process.env.DATABASE_URL
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set')
+    }
+
+    try {
+      this.pool = new Pool({
+        connectionString: DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      })
+
+      // Test the connection
+      const client = await this.pool.connect()
+      await client.query('SELECT NOW()')
+      client.release()
+
+      console.log('Database connection pool created successfully')
+      await this.insertSampleData()
+    } catch (error) {
+      console.error('Failed to connect to database:', error)
+      this.pool = null
+      throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  private async insertSampleData(): Promise<void> {
+    if (!this.pool) {
+      throw new Error('Database not initialized')
+    }
+
+    const sampleData = [
+      ['COPYRIGHT', 'LAOS', 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE', 1000, 500, 100, 'LAK'],
+      ['COPYRIGHT', 'INDONESIA', 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH INDONESIA COPYRIGHT OFFICE', 1200, 600, 150, 'IDR'],
+      ['PATENT', 'MALAYSIA', 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM RM7000 TO RM9000 )', 8000, 0, 0, 'MYR'],
+      ['PATENT', 'SINGAPORE', 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM SGD8000 TO SGD10000 )', 9000, 0, 0, 'SGD'],
+      ['TRADEMARK', 'THAILAND', 'TRADEMARK SEARCH - COMPREHENSIVE TRADEMARK SEARCH IN THAILAND', 500, 200, 50, 'THB'],
+      ['TRADEMARK', 'VIETNAM', 'TRADEMARK SEARCH - COMPREHENSIVE TRADEMARK SEARCH IN VIETNAM', 600, 250, 70, 'VND'],
+    ]
+
+    const client = await this.pool.connect()
+    try {
+      // Check if table exists, if not create it
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS quotationlist (
+          id SERIAL PRIMARY KEY,
+          service TEXT,
+          country TEXT,
+          item TEXT,
+          "prof fee" INTEGER,
+          "official fee" INTEGER,
+          disbursement INTEGER,
+          currency TEXT
+        )
+      `)
+
+      // Check if data already exists
+      const existingCount = await client.query('SELECT COUNT(*) FROM quotationlist')
+      if (existingCount.rows[0].count === '0') {
+        for (const dataRow of sampleData) {
+          await client.query(`
+            INSERT INTO quotationlist (service, country, item, "prof fee", "official fee", disbursement, currency)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, dataRow)
+        }
+        console.log('Sample data inserted successfully')
+      } else {
+        console.log('Sample data already exists, skipping insertion')
+      }
+    } finally {
+      client.release()
+    }
+  }
 
   async getServices(): Promise<Service[]> {
-    const services: Service[] = []
-    const seenServices = new Set<string>()
-    
-    for (const record of this.data) {
-      if (!seenServices.has(record.service)) {
-        services.push({
-          id: record.service.toLowerCase(),
-          name: record.service,
-          description: `${record.service} services for intellectual property protection`
-        })
-        seenServices.add(record.service)
-      }
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
     }
-    
-    return services
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query('SELECT DISTINCT service FROM quotationlist ORDER BY service')
+        return result.rows.map(row => ({
+          id: row.service.toLowerCase(),
+          name: row.service,
+          description: `${row.service} services for intellectual property protection`
+        }))
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error fetching services from database: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async getCountriesForService(serviceName: string): Promise<Country[]> {
-    const countries: Country[] = []
-    const seenCountries = new Set<string>()
-    
-    for (const record of this.data) {
-      if (record.service === serviceName && !seenCountries.has(record.country)) {
-        countries.push({
-          id: record.country.toLowerCase().replace(' ', '_'),
-          name: record.country,
-          currency: record.currency
-        })
-        seenCountries.add(record.country)
-      }
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
     }
-    
-    return countries
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query(
+          'SELECT DISTINCT country, currency FROM quotationlist WHERE service = $1 ORDER BY country',
+          [serviceName]
+        )
+        return result.rows.map(row => ({
+          id: row.country.toLowerCase().replace(' ', '_'),
+          name: row.country,
+          currency: row.currency
+        }))
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error fetching countries for service ${serviceName} from database: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async getItemsForServiceCountry(serviceName: string, countryName: string): Promise<ServiceItem[]> {
-    const items: ServiceItem[] = []
-    
-    for (const record of this.data) {
-      if (record.service === serviceName && record.country === countryName) {
-        const totalCost = record.prof_fee + record.official_fee + record.disbursement
-        items.push({
-          id: record.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-          name: record.item,
-          description: `${record.service} service in ${record.country}`,
-          professional_fee: record.prof_fee,
-          official_fee: record.official_fee,
-          disbursement: record.disbursement,
-          currency: record.currency,
-          total_cost: totalCost
-        })
-      }
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
     }
-    
-    return items
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query(`
+          SELECT item, "prof fee", "official fee", disbursement, currency
+          FROM quotationlist
+          WHERE service = $1 AND country = $2
+          ORDER BY item
+        `, [serviceName, countryName])
+
+        return result.rows.map(row => {
+          const totalCost = row['prof fee'] + row['official fee'] + row.disbursement
+          return {
+            id: row.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+            name: row.item,
+            description: `${serviceName} service in ${countryName}`,
+            professional_fee: row['prof fee'],
+            official_fee: row['official fee'],
+            disbursement: row.disbursement,
+            currency: row.currency,
+            total_cost: totalCost
+          }
+        })
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error fetching items for service ${serviceName} and country ${countryName} from database: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   async getItemById(itemId: string): Promise<ServiceItem | null> {
-    const record = this.data.find(r => 
-      r.item.toLowerCase().replace(/[^a-z0-9]/g, '_') === itemId
-    )
-    
-    if (!record) return null
-    
-    const totalCost = record.prof_fee + record.official_fee + record.disbursement
-    return {
-      id: record.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      name: record.item,
-      description: `${record.service} service in ${record.country}`,
-      professional_fee: record.prof_fee,
-      official_fee: record.official_fee,
-      disbursement: record.disbursement,
-      currency: record.currency,
-      total_cost: totalCost
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
+    }
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query(`
+          SELECT item, "prof fee", "official fee", disbursement, currency, service, country
+          FROM quotationlist
+          WHERE item = $1
+        `, [itemId])
+
+        if (result.rows.length === 0) {
+          return null
+        }
+
+        const row = result.rows[0]
+        const totalCost = row['prof fee'] + row['official fee'] + row.disbursement
+        return {
+          id: row.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          name: row.item,
+          description: `${row.service} service in ${row.country}`,
+          professional_fee: row['prof fee'],
+          official_fee: row['official fee'],
+          disbursement: row.disbursement,
+          currency: row.currency,
+          total_cost: totalCost
+        }
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error fetching item ${itemId} from database: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   async generateQuotationSummary(serviceName: string, countryName: string, itemName: string): Promise<QuotationSummary> {
-    const record = this.data.find(r => 
-      r.service === serviceName && 
-      r.country === countryName && 
-      r.item === itemName
-    )
-    
-    if (!record) {
-      throw new Error(`Item not found: ${serviceName} - ${countryName} - ${itemName}`)
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
     }
-    
-    const totalCost = record.prof_fee + record.official_fee + record.disbursement
-    const quotationId = `Q${Date.now()}`
-    const generatedAt = new Date().toISOString()
-    const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    
-    return {
-      service: serviceName,
-      country: countryName,
-      item: {
-        id: record.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-        name: record.item,
-        description: `${serviceName} service in ${countryName}`,
-        professional_fee: record.prof_fee,
-        official_fee: record.official_fee,
-        disbursement: record.disbursement,
-        currency: record.currency,
-        total_cost: totalCost
-      },
-      quotation_id: quotationId,
-      generated_at: generatedAt,
-      valid_until: validUntil
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query(`
+          SELECT item, "prof fee", "official fee", disbursement, currency
+          FROM quotationlist
+          WHERE service = $1 AND country = $2 AND item = $3
+        `, [serviceName, countryName, itemName])
+
+        if (result.rows.length === 0) {
+          throw new Error(`Item not found: ${serviceName} - ${countryName} - ${itemName}`)
+        }
+
+        const row = result.rows[0]
+        const totalCost = row['prof fee'] + row['official fee'] + row.disbursement
+        const quotationId = `Q${Date.now()}`
+        const generatedAt = new Date().toISOString()
+        const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+        return {
+          service: serviceName,
+          country: countryName,
+          item: {
+            id: row.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+            name: row.item,
+            description: `${serviceName} service in ${countryName}`,
+            professional_fee: row['prof fee'],
+            official_fee: row['official fee'],
+            disbursement: row.disbursement,
+            currency: row.currency,
+            total_cost: totalCost
+          },
+          quotation_id: quotationId,
+          generated_at: generatedAt,
+          valid_until: validUntil
+        }
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error generating quotation summary: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   async getAllRecordsForService(serviceName: string): Promise<QuotationRecord[]> {
-    return this.data.filter(record => record.service === serviceName)
-  }
-
-  // Method to add new records (for future database integration)
-  async addRecord(record: Omit<QuotationRecord, 'id'>): Promise<QuotationRecord> {
-    const newRecord: QuotationRecord = {
-      id: Math.max(...this.data.map(r => r.id)) + 1,
-      ...record
+    if (!this.pool) {
+      throw new Error('Database not initialized. Please check your database connection.')
     }
-    this.data.push(newRecord)
-    return newRecord
+
+    try {
+      const client = await this.pool.connect()
+      try {
+        const result = await client.query(
+          'SELECT * FROM quotationlist WHERE service = $1 ORDER BY country, item',
+          [serviceName]
+        )
+        return result.rows.map(row => ({
+          id: row.id,
+          service: row.service,
+          country: row.country,
+          item: row.item,
+          prof_fee: row['prof fee'],
+          official_fee: row['official fee'],
+          disbursement: row.disbursement,
+          currency: row.currency
+        }))
+      } finally {
+        client.release()
+      }
+    } catch (error) {
+      throw new Error(`Error fetching all records for service ${serviceName}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
-  // Method to update records
-  async updateRecord(id: number, updates: Partial<Omit<QuotationRecord, 'id'>>): Promise<QuotationRecord | null> {
-    const index = this.data.findIndex(r => r.id === id)
-    if (index === -1) return null
-    
-    this.data[index] = { ...this.data[index], ...updates }
-    return this.data[index]
-  }
-
-  // Method to delete records
-  async deleteRecord(id: number): Promise<boolean> {
-    const index = this.data.findIndex(r => r.id === id)
-    if (index === -1) return false
-    
-    this.data.splice(index, 1)
-    return true
+  async close(): Promise<void> {
+    if (this.pool) {
+      await this.pool.end()
+      this.pool = null
+    }
   }
 }
 
