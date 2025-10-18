@@ -1,0 +1,31 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Installing Node.js dependencies..."
+        - npm ci
+        - echo "Installing Python dependencies..."
+        - pip install -r requirements.txt
+        - echo "Setting up environment variables..."
+        - echo "DATABASE_URL=$DATABASE_URL" >> .env.local
+    build:
+      commands:
+        - echo "Building the Next.js application..."
+        - npm run build
+        - echo "Generating Amplify outputs..."
+        - npx ampx generate outputs --app-id $AWS_APP_ID --branch $AWS_BRANCH
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
+      - .next/static/**/*
+      - lib/__pycache__/**/*
+  environment:
+    variables:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
