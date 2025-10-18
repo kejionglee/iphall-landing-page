@@ -7,11 +7,6 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "python:install": "pip install -r requirements.txt",
-    "python:test": "python -m pytest lib/",
-    "db:setup": "psql -h localhost -U postgres -d iphall -f database/schema.sql",
-    "db:reset": "psql -h localhost -U postgres -c 'DROP TABLE IF EXISTS quotationlist CASCADE;' && npm run db:setup",
-    "db:test": "python -c 'import asyncio; from lib.python_api import check_agent_health; print(asyncio.run(check_agent_health()))'",
     "amplify:dev": "npx ampx sandbox",
     "amplify:deploy": "npx ampx pipeline-deploy --branch main"
   },
