@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
 
 interface Service {
   id: string
@@ -33,145 +32,162 @@ interface QuotationSummary {
   valid_until: string
 }
 
-// Function to call Python database functions
-async function callPythonDatabase(functionName: string, ...args: any[]): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const pythonProcess = spawn('python3', [
-      '-c',
-      `
-import sys
-import os
-import asyncio
-import json
-sys.path.append('${process.cwd()}/lib')
+// Sample data - in production this would come from a database
+const SAMPLE_DATA = [
+  {
+    service: 'COPYRIGHT',
+    country: 'LAOS',
+    item: 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH LAOS COPYRIGHT OFFICE',
+    prof_fee: 500,
+    official_fee: 200,
+    disbursement: 50,
+    currency: 'USD'
+  },
+  {
+    service: 'COPYRIGHT',
+    country: 'INDONESIA',
+    item: 'OFFICIAL COPYRIGHT RECORDATION - FILING NOTIFICATION OF COPYRIGHT AND DESCRIPTION OF COPYRIGHTED WORK WITH INDONESIA COPYRIGHT OFFICE',
+    prof_fee: 600,
+    official_fee: 250,
+    disbursement: 75,
+    currency: 'USD'
+  },
+  {
+    service: 'PATENT',
+    country: 'MALAYSIA',
+    item: 'DRAFTING - DRAFTING OF PATENT / UTILITY INNOVATION SPECIFICATION ( PRICE RANGE FROM RM7000 TO RM9000 )',
+    prof_fee: 2000,
+    official_fee: 500,
+    disbursement: 100,
+    currency: 'MYR'
+  }
+]
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
-
-from database import db_manager
-
-async def main():
-    try:
-        # Initialize database if not already done
-        if not db_manager.connection_pool:
-            await db_manager.initialize()
-            await db_manager.insert_sample_data()
-        
-        # Call the requested function
-        if "${functionName}" == "get_services":
-            result = await db_manager.get_services()
-        elif "${functionName}" == "get_countries_for_service":
-            service_name = "${args[0] || ''}"
-            print(f"DEBUG: Getting countries for service: '{service_name}'")
-            result = await db_manager.get_countries_for_service(service_name)
-            print(f"DEBUG: Result: {result}")
-        elif "${functionName}" == "get_items_for_service_country":
-            result = await db_manager.get_items_for_service_country("${args[0] || ''}", "${args[1] || ''}")
-        elif "${functionName}" == "get_item_by_id":
-            result = await db_manager.get_item_by_id("${args[0] || ''}")
-        elif "${functionName}" == "generate_quotation_summary":
-            result = await db_manager.generate_quotation_summary("${args[0] || ''}", "${args[1] || ''}", "${args[2] || ''}")
-        else:
-            result = {"error": "Unknown function"}
-        
-        print(json.dumps(result))
-    except Exception as e:
-        print(json.dumps({"error": str(e)}))
-
-asyncio.run(main())
-      `
-    ], {
-      cwd: process.cwd(),
-      env: { ...process.env }
-    })
-
-    let output = ''
-    let error = ''
-
-    pythonProcess.stdout.on('data', (data) => {
-      output += data.toString()
-    })
-
-    pythonProcess.stderr.on('data', (data) => {
-      error += data.toString()
-    })
-
-    pythonProcess.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Python process exited with code ${code}: ${error}`))
-        return
-      }
-
-      try {
-        const lines = output.trim().split('\n')
-        let jsonLine = ''
-        
-        for (const line of lines) {
-          const trimmedLine = line.trim()
-          if (trimmedLine.startsWith('{') || trimmedLine.startsWith('[')) {
-            jsonLine = trimmedLine
-            break
-          }
-        }
-        
-        if (!jsonLine) {
-          throw new Error('No valid JSON found in output')
-        }
-        
-        const result = JSON.parse(jsonLine)
-        resolve(result)
-      } catch (parseError) {
-        reject(new Error(`Failed to parse Python output: ${parseError}`))
-      }
-    })
-
-    pythonProcess.on('error', (err) => {
-      reject(new Error(`Failed to spawn Python process: ${err.message}`))
-    })
-  })
+function getServices(): Service[] {
+  const services: Service[] = []
+  const seenServices = new Set<string>()
+  
+  for (const item of SAMPLE_DATA) {
+    if (!seenServices.has(item.service)) {
+      services.push({
+        id: item.service.toLowerCase(),
+        name: item.service,
+        description: `${item.service} services for intellectual property protection`
+      })
+      seenServices.add(item.service)
+    }
+  }
+  
+  return services
 }
 
-// GET /api/quotation/services
+function getCountriesForService(serviceName: string): Country[] {
+  const countries: Country[] = []
+  const seenCountries = new Set<string>()
+  
+  for (const item of SAMPLE_DATA) {
+    if (item.service === serviceName && !seenCountries.has(item.country)) {
+      countries.push({
+        id: item.country.toLowerCase().replace(' ', '_'),
+        name: item.country,
+        currency: item.currency
+      })
+      seenCountries.add(item.country)
+    }
+  }
+  
+  return countries
+}
+
+function getItemsForServiceCountry(serviceName: string, countryName: string): ServiceItem[] {
+  const items: ServiceItem[] = []
+  
+  for (const item of SAMPLE_DATA) {
+    if (item.service === serviceName && item.country === countryName) {
+      const totalCost = item.prof_fee + item.official_fee + item.disbursement
+      items.push({
+        id: item.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        name: item.item,
+        description: `${item.service} service in ${item.country}`,
+        professional_fee: item.prof_fee,
+        official_fee: item.official_fee,
+        disbursement: item.disbursement,
+        currency: item.currency,
+        total_cost: totalCost
+      })
+    }
+  }
+  
+  return items
+}
+
+function generateQuotationSummary(serviceName: string, countryName: string, itemName: string): QuotationSummary {
+  const item = SAMPLE_DATA.find(
+    data => data.service === serviceName && 
+           data.country === countryName && 
+           data.item === itemName
+  )
+  
+  if (!item) {
+    throw new Error(`Item not found: ${serviceName} - ${countryName} - ${itemName}`)
+  }
+  
+  const totalCost = item.prof_fee + item.official_fee + item.disbursement
+  const quotationId = `Q${Date.now()}`
+  const generatedAt = new Date().toISOString()
+  const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  
+  return {
+    service: serviceName,
+    country: countryName,
+    item: {
+      id: item.item.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      name: item.item,
+      description: `${serviceName} service in ${countryName}`,
+      professional_fee: item.prof_fee,
+      official_fee: item.official_fee,
+      disbursement: item.disbursement,
+      currency: item.currency,
+      total_cost: totalCost
+    },
+    quotation_id: quotationId,
+    generated_at: generatedAt,
+    valid_until: validUntil
+  }
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const path = url.pathname
 
   try {
     if (path === '/api/quotation/services') {
-      const services = await callPythonDatabase('get_services')
+      const services = getServices()
       return NextResponse.json({ services })
     }
     
     if (path.startsWith('/api/quotation/services/') && path.includes('/countries/') && path.includes('/items')) {
       const pathParts = path.split('/')
-      const serviceId = pathParts[4]  // Fixed: should be index 4, not 3
-      const countryId = pathParts[6]  // Fixed: should be index 6, not 5
-      const items = await callPythonDatabase('get_items_for_service_country', serviceId, countryId)
+      const serviceId = pathParts[4]
+      const countryId = pathParts[6]
+      const items = getItemsForServiceCountry(serviceId, countryId)
       return NextResponse.json({ items })
     }
     
     if (path.startsWith('/api/quotation/services/') && path.includes('/countries')) {
       const pathParts = path.split('/')
-      const serviceId = pathParts[4]  // Fixed: should be index 4, not 3
-      const countries = await callPythonDatabase('get_countries_for_service', serviceId)
+      const serviceId = pathParts[4]
+      const countries = getCountriesForService(serviceId)
       return NextResponse.json({ countries })
-    }
-    
-    if (path.startsWith('/api/quotation/items/')) {
-      const pathParts = path.split('/')
-      const itemId = pathParts[3]
-      const item = await callPythonDatabase('get_item_by_id', itemId)
-      return NextResponse.json({ item })
     }
     
     if (path.startsWith('/api/quotation/generate/')) {
       const pathParts = path.split('/')
-      const serviceId = pathParts[3]
-      const countryId = pathParts[4]
-      const itemId = pathParts[5]
-      const quotation = await callPythonDatabase('generate_quotation_summary', serviceId, countryId, itemId)
-      return NextResponse.json({ quotation })
+      const serviceId = pathParts[4]
+      const countryId = pathParts[5]
+      const itemId = pathParts[6]
+      const quotation = generateQuotationSummary(serviceId, countryId, itemId)
+      return NextResponse.json(quotation)
     }
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

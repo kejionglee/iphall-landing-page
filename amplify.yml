@@ -5,10 +5,8 @@ frontend:
       commands:
         - echo "Installing Node.js dependencies..."
         - npm ci --legacy-peer-deps
-        - echo "Installing Python dependencies..."
-        - pip install -r requirements.txt
-        - echo "Setting up environment variables..."
-        - echo "DATABASE_URL=$DATABASE_URL" >> .env.local
+        - echo "Installing Python dependencies for Lambda functions..."
+        - pip install asyncpg python-dotenv -t amplify/backend/functions/quotation-api/
     build:
       commands:
         - echo "Building the Next.js application..."
