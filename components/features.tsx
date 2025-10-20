@@ -37,14 +37,7 @@ export function Features() {
       icon: TrendingUp,
       title: "Patent Commercialization & Valuation",
       description: "Multi-method valuation engine, intelligent company matching, automated outreach campaigns, and personalized communications for strategic IP monetization.",
-    },
-    
-    // Cross-Module: Multi-Jurisdictional Management
-    {
-      icon: Globe,
-      title: "Multi-Jurisdictional Management",
-      description: "Comprehensive IP management across global jurisdictions with unified workflow, compliance monitoring, and strategic portfolio oversight.",
-    },
+    }
   ]
 
   return (
