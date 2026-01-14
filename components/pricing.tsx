@@ -90,7 +90,7 @@ export function Pricing() {
           </p>
         </div>
 
-        {/* Main Pricing Plans */}
+        {/* Main Pricing Plans (commented out)
         <div className="mb-16 grid gap-8 md:grid-cols-3">
           {plans.map((plan, index) => (
             <Card key={index} className={`relative flex flex-col p-8 transition-all hover:shadow-lg ${
@@ -135,8 +135,9 @@ export function Pricing() {
             </Card>
           ))}
         </div>
+        */}
 
-        {/* Add-ons Section */}
+        {/* Add-ons Section (commented out)
         <div className="rounded-lg border bg-background p-8">
           <div className="mb-6 text-center">
             <h3 className="mb-2 text-2xl font-semibold">Additional Services</h3>
@@ -158,6 +159,7 @@ export function Pricing() {
             ))}
           </div>
         </div>
+        */}
 
         {/* Instant Quote Section */}
         <div className="mt-12 rounded-lg border-2 border-green-200 bg-gradient-to-r from-green-50 to-green-100 p-8 text-center">

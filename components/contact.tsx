@@ -101,7 +101,6 @@ export function Contact() {
                     <option>Intelligent Filing & Case Management</option>
                     <option>Strategic Enforcement Intelligence</option>
                     <option>Patent Commercialization</option>
-                    <option>Multi-Jurisdictional Management</option>
                     <option>Enterprise Solution</option>
                   </select>
                 </div>
