@@ -3,11 +3,11 @@ import { Menu } from "lucide-react"
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="glass sticky top-0 z-50 w-full border-b border-border/40">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 items-center justify-center rounded-lg bg-primary px-2">
+          <div className="group flex items-center gap-2">
+            <div className="flex h-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-chart-3 px-2 shadow-md shadow-primary/30 transition-transform group-hover:scale-105">
               <span className="whitespace-nowrap text-lg font-bold text-primary-foreground">IPHALL</span>
             </div>
             <span className="text-xl font-bold">IP Patent AI Agent</span>
@@ -25,6 +25,12 @@ export function Header() {
             Features
           </a>
           <a
+            href="#demo"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Demo
+          </a>
+          <a
             href="#pricing"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
@@ -39,7 +45,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <Button className="hidden md:inline-flex" asChild>
+          <Button className="shimmer-sweep hidden shadow-md shadow-primary/20 transition-transform hover:scale-105 md:inline-flex" asChild>
             <a href="#contact">Book Demo</a>
           </Button>
           <Button variant="ghost" size="icon" className="md:hidden">

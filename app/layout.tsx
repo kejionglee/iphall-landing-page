@@ -6,9 +6,21 @@ import './globals.css'
 import '../lib/amplify'
 
 export const metadata: Metadata = {
-  title: 'IP Patent AI Agent',
-  description: 'AI-powered intellectual property management platform for patent drafting, prior art search, and IP portfolio management.',
-  generator: 'v0.app',
+  title: 'IPHALL — AI-Powered Patent & IP Platform',
+  description:
+    'IPHALL is an AI platform for the full patent lifecycle: drafting, office action responses, novelty search, validity, freedom-to-operate (FTO), translation, and diagram generation. Built by Pintas IP Group.',
+  keywords: [
+    'patent AI',
+    'patent drafting',
+    'freedom to operate',
+    'FTO analysis',
+    'patent search',
+    'validity analysis',
+    'office action',
+    'patent translation',
+    'intellectual property',
+    'Pintas IP',
+  ],
 }
 
 export default function RootLayout({

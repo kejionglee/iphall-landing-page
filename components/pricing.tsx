@@ -86,7 +86,7 @@ export function Pricing() {
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">Transparent Pricing</h2>
           <p className="mx-auto max-w-2xl text-pretty text-lg text-muted-foreground">
-            Choose the plan that fits your IP management needs. All plans include our core AI-powered features.
+            Tell us about your matter and get an instant, detailed quote — across services and jurisdictions — in seconds.
           </p>
         </div>
 

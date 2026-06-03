@@ -2,9 +2,11 @@ import { Header } from "@/components/header"
 import { Hero } from "@/components/hero"
 import { HowItWorks } from "@/components/how-it-works"
 import { Features } from "@/components/features"
+import { ProductDemo } from "@/components/product-demo"
 import { Pricing } from "@/components/pricing"
 import { Contact } from "@/components/contact"
 import { TrustedBy } from "@/components/trusted-by"
+import { Footer } from "@/components/footer"
 import { SalesQuotationWidget } from "@/components/sales-quotation-widget"
 
 export default function Home() {
@@ -15,8 +17,10 @@ export default function Home() {
       <TrustedBy />
       <HowItWorks />
       <Features />
+      <ProductDemo />
       <Pricing />
       <Contact />
+      <Footer />
       <SalesQuotationWidget />
     </main>
   )
